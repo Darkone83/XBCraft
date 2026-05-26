@@ -4,7 +4,7 @@ A port of the classic voxel sandbox game [Craft](https://github.com/fogleman/Cra
 
 <div align=center>
 
-<img src="https://github.com/Darkone83/XBCraft/blob/main/img/main.jpg" width=425><img src="https://github.com/Darkone83/XBCraft/blob/main/img/game.jpg" width=425>
+<img src="https://github.com/Darkone83/XBCraft/blob/main/img/main.jpg" width=400><img src="https://github.com/Darkone83/XBCraft/blob/main/img/game.jpg" width=400>
 
 </div>
 

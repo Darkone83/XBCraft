@@ -103,22 +103,46 @@ XbCraft is built with the **Xbox Development Kit (XDK)** using Visual Studio 200
 - Visual Studio 2003 or compatible MSVC toolchain
 - D3DX8 (included with XDK)
 
-### Project structure
 
+### Project structure
+ 
 ```
 XbCraft/
+│
 ├── main.cpp          — Entry point, game state machine, main loop
-├── chunks.cpp/h      — Chunk mesh generation and rendering
-├── chunkcache.cpp/h  — World streaming and HDD save system
-├── menu.cpp/h        — All menu screens
-├── world.cpp/h       — Terrain and world generation
+│
+├── — World —
+├── world.cpp/h       — Procedural terrain and feature generation
+├── chunks.cpp/h      — Chunk mesh generation, rendering, toggle gates
+├── chunkcache.cpp/h  — HDD chunk streaming (chunks.dat) and save state
+├── map.cpp/h         — Block map storage per chunk
 ├── cube.cpp/h        — Block geometry and face building
+├── item.cpp/h        — Block type definitions and properties
+├── noise.cpp/h       — Perlin noise for terrain generation
+├── db.cpp/h          — Block edit persistence (craft.db)
+│
+├── — Menus & UI —
+├── menu.cpp/h        — All menu screens (main, pause, settings, help)
+├── font.cpp/h        — 5x7 bitmap font renderer, no textures
+├── tex.cpp/h         — DDS texture loading with background preload cache
+│
+├── — Engine —
+├── render.cpp/h      — D3D8 device, frame management, fog
 ├── matrix.cpp/h      — Math (projection, view, item matrix)
-├── font.cpp/h        — Bitmap font renderer
-├── render.cpp/h      — D3D8 device and frame management
-├── audio.cpp/h       — Music and XMV video playback
+├── audio.cpp/h       — Music playback
+├── video.cpp/h       — XMV intro video playback
 ├── input.cpp/h       — Xbox controller input
-└── lodepng.c/h       — PNG texture loading (no STL, C-compatible)
+├── ring.cpp/h        — Ring buffer utility
+├── util.cpp/h        — General utilities
+├── ftol2.cpp         — float-to-int stub (absent from Xbox CRT)
+│
+├── — Third Party —
+├── lodepng.c/h       — PNG texture loading, C-compatible, no STL
+├── minimp3.h         — MP3 decode (header only)
+│
+└── — Config & Platform —
+    ├── config.h      — Build constants (seed, chunk size, radii, limits)
+    └── windows.h     — Minimal Win32 shim for Xbox build environment
 ```
 
 Build the project by opening `XbCraft.vcxproj` in Visual Studio, selecting the Xbox target, and building. The output `default.xbe` and accompanying media files need to be deployed together.

@@ -2,7 +2,17 @@
 
 A port of the classic voxel sandbox game [Craft](https://github.com/fogleman/Craft) to the original Microsoft Xbox, built by **Team Resurgent** / **Darkone83**.
 
-![XbCraft running on original Xbox hardware](.github/screenshot.jpg)
+<div align=center>
+
+<img src="https://github.com/Darkone83/XBCraft/blob/main/img/main.jpg" width=425><img src="https://github.com/Darkone83/XBCraft/blob/main/img/game.jpg" width=425>
+
+</div>
+
+<div align=center>
+
+<img src="https://github.com/Darkone83/XBCraft/blob/main/img/Darkone83.png">
+
+</div>
 
 ---
 

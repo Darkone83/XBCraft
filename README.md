@@ -20,7 +20,7 @@ A port of the classic voxel sandbox game [Craft](https://github.com/fogleman/Cra
 
 XbCraft brings the simple joy of block building and exploration to original Xbox hardware. Dig, place, and explore an infinite procedurally generated world — entirely offline, entirely on original hardware, no emulation required.
 
-This is a passion project for the original Xbox homebrew community. If you own a softmodded Xbox and want something new to play, this is for you.
+This is a passion project for the original Xbox homebrew community. If you own a modded or softmodded Xbox and want something new to play, this is for you.
 
 ---
 

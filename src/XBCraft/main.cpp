@@ -833,7 +833,7 @@ static void Play_Update(float dt)
     fov = (btns & CRAFT_BTN_ZOOM) ? ZOOM_FOV : NORMAL_FOV;
     Render_BeginFrame(SkyHorizon(daylight));
     Sky_Draw(daylight, s_player.ry, s_player.rx);
-    Chunks_Draw(s_player.x, s_player.y - EYE_OFFSET, s_player.z, s_player.rx, s_player.ry, fov, 0);
+    Chunks_Draw(s_player.x, s_player.y - EYE_OFFSET, s_player.z, s_player.rx, s_player.ry, fov, 0, daylight);
     if (g_show_wireframe) DrawWireframe(&s_player);
     if (g_show_item)      DrawHeldItem(&s_player);
     if (g_show_crosshairs) DrawCrosshair();
@@ -1091,7 +1091,7 @@ static void Paused_Draw(void)
     Render_BeginFrame(SkyHorizon(daylight));
     Sky_Draw(daylight, s_player.ry, s_player.rx);
     Chunks_Draw(s_player.x, s_player.y - EYE_OFFSET, s_player.z,
-        s_player.rx, s_player.ry, fov, 0);
+        s_player.rx, s_player.ry, fov, 0, daylight);
     if (Menu_SettingsActive())
         Menu_SettingsDraw();
     else

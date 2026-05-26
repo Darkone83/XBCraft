@@ -50,8 +50,7 @@ void    Chunks_Update(float px, float py, float pz,
 /* Draw all visible chunks within render_r of the player.
    Sets D3D transforms, binds atlas, draws solid then plant passes.        */
 void    Chunks_Draw(float x, float y, float z,
-    float rx, float ry, float fov, int ortho);
-
+    float rx, float ry, float fov, int ortho, float daylight);
 /* Force-rebuild all dirty chunks -- used during initial world load.       */
 /* Create ALL chunks in radius synchronously -- loading screen only.
    progress_cb(done, total) is called after each chunk; pass NULL to skip. */

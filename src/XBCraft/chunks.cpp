@@ -512,9 +512,9 @@ static HRESULT LoadPNGTexture(const char* pszPath, IDirect3DTexture8** ppTex,
 {
     HANDLE             hFile = INVALID_HANDLE_VALUE;
     DWORD              dwSize, dwRead;
-    unsigned char*     pFile = NULL;
-    unsigned char*     pRGBA = NULL;
-    unsigned char*     pTemp = NULL;
+    unsigned char* pFile = NULL;
+    unsigned char* pRGBA = NULL;
+    unsigned char* pTemp = NULL;
     int                iw = 0, ih = 0;
     unsigned int       y, x;
     IDirect3DTexture8* pTex = NULL;
@@ -856,7 +856,7 @@ void Chunks_MarkAllDirty(void)
 }
 
 void Chunks_Draw(float x, float y, float z,
-    float rx, float ry, float fov, int ortho)
+    float rx, float ry, float fov, int ortho, float daylight)
 {
     float     matrix[16];
     float     planes[6][4];
@@ -886,6 +886,18 @@ void Chunks_Draw(float x, float y, float z,
     /* Bind atlas and set FVF */
     g_pd3dDevice->SetTexture(0, s_pAtlas);
     g_pd3dDevice->SetVertexShader(CRAFT_FVF);
+
+    /* Modulate world brightness by daylight using TEXTUREFACTOR.
+       Min brightness 0.08 so the world is never completely black.        */
+    {
+        float bright = daylight * 0.92f + 0.08f;
+        BYTE  b = (BYTE)(bright * 255.f);
+        DWORD factor = D3DCOLOR_XRGB(b, b, b);
+        g_pd3dDevice->SetRenderState(D3DRS_TEXTUREFACTOR, factor);
+        g_pd3dDevice->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+        g_pd3dDevice->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+        g_pd3dDevice->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
+    }
 
     /* Alpha test for both solid (leaves) and plant passes.
        Keep blending off for the voxel atlas; transparent pixels are cut out
@@ -933,6 +945,9 @@ void Chunks_Draw(float x, float y, float z,
         g_pd3dDevice->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
     } /* g_show_plants */
     g_pd3dDevice->SetTexture(0, NULL);
+    g_pd3dDevice->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+    g_pd3dDevice->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    g_pd3dDevice->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
 }
 
 IDirect3DTexture8* Chunks_GetAtlas(void) { return s_pAtlas; }

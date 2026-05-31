@@ -47,8 +47,6 @@
    Matches the ScorchedXB pattern exactly.
 ========================================================================= */
 
-
-
 static int s_world_seed = WORLD_SEED;
 static int s_loading_resume = 0;
 static int s_loading_saved_label = 0;
@@ -266,6 +264,7 @@ typedef enum
     STATE_VIDEO = 0,
     STATE_TITLE,
     STATE_MAIN_MENU,
+    STATE_MODESELECT,
     STATE_SETTINGS,
     STATE_HELP,
     STATE_LOADING,
@@ -273,6 +272,11 @@ typedef enum
     STATE_PAUSED,
     STATE_SHUTDOWN
 } GameState;
+
+/* Game mode -- persisted in save.dat                                      */
+#define MODE_CREATIVE  0
+#define MODE_SURVIVAL  1
+int g_game_mode = MODE_CREATIVE;
 
 static GameState s_eState = STATE_VIDEO;
 static GameState s_ePrevState = STATE_VIDEO;
@@ -330,6 +334,7 @@ static void StartFadeOut(GameState eTarget)
 
 static void State_Enter(GameState eNew);
 static void SaveCurrentGameState(void);
+static void LoadGameMode(void);
 
 static void FadeUpdate(void)
 {
@@ -520,8 +525,13 @@ static void DrawHeldItem(Player* p)
     float     ao[6][4], lt[6][4];
     float     verts[36 * CRAFT_VERT_FLOATS];
     float     mat[16];
-    D3DMATRIX id, d3dmat;
-    int       w;
+    int       w, i;
+    float     sw = (float)g_dwDisplayW;
+    float     sh = (float)g_dwDisplayH;
+
+    /* Pre-transformed screen-space vertex: pos already in screen pixels   */
+    typedef struct { float x, y, z, rhw; DWORD c; float u, v; } HV;
+    HV hv[36];
 
     if (!g_show_item || p->item < 0 || p->item >= item_count) return;
 
@@ -535,30 +545,36 @@ static void DrawHeldItem(Player* p)
         1, 1, 1, 1, 1, 1,
         0.f, 0.f, 0.f, 0.5f, w);
 
-    set_matrix_item(mat, (int)g_dwDisplayW, (int)g_dwDisplayH, 2);
+    set_matrix_item(mat, (int)g_dwDisplayW, (int)g_dwDisplayH, 1);
 
-    memset(&id, 0, sizeof(id));
-    id._11 = id._22 = id._33 = id._44 = 1.f;
-    memcpy(&d3dmat, mat, sizeof(d3dmat));
+    /* Transform each vertex through the item matrix on the CPU.  mat_apply
+       takes the column-major matrix and produces NDC coordinates.  We then
+       map NDC (-1..1) to screen pixels and emit XYZRHW so D3D does no
+       further transformation -- this avoids all transform-pipeline matrix
+       layout ambiguity.                                                    */
+    mat_apply(verts, mat, 36, 0, CRAFT_VERT_FLOATS);
 
-    g_pd3dDevice->SetTransform(D3DTS_WORLD, &id);
-    g_pd3dDevice->SetTransform(D3DTS_VIEW, &id);
-    g_pd3dDevice->SetTransform(D3DTS_PROJECTION, &d3dmat);
+    for (i = 0; i < 36; i++)
+    {
+        float* src = verts + i * CRAFT_VERT_FLOATS;
+        float  nx = src[0];
+        float  ny = src[1];
+        DWORD  col = *((DWORD*)(src + 3));
+
+        hv[i].x = (nx * 0.5f + 0.5f) * sw;
+        hv[i].y = (0.5f - ny * 0.5f) * sh;   /* flip Y for screen space */
+        hv[i].z = 0.5f;
+        hv[i].rhw = 1.f;
+        hv[i].c = col;
+        hv[i].u = src[4];
+        hv[i].v = src[5];
+    }
 
     g_pd3dDevice->SetTexture(0, Chunks_GetAtlas());
-    g_pd3dDevice->SetVertexShader(CRAFT_FVF);
+    g_pd3dDevice->SetVertexShader(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
 
-    /* HUD item is rendered as its own tiny 3D pass.  The old path disabled
-       Z and culling together; that let the cube back faces draw over the
-       front faces, which made the held block look inverted/inside-out.
-       Clear only the depth buffer after the world has drawn, then render the
-       item with normal depth testing so its own faces sort correctly while
-       still overlaying the world. */
-    g_pd3dDevice->Clear(0, NULL, D3DCLEAR_ZBUFFER, 0, 1.0f, 0);
-    g_pd3dDevice->SetRenderState(D3DRS_ZENABLE, TRUE);
-    g_pd3dDevice->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
-    g_pd3dDevice->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
-    g_pd3dDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+    g_pd3dDevice->SetRenderState(D3DRS_ZENABLE, FALSE);
+    g_pd3dDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW);
     g_pd3dDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
     g_pd3dDevice->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
     g_pd3dDevice->SetRenderState(D3DRS_ALPHAREF, 0x7F);
@@ -569,11 +585,9 @@ static void DrawHeldItem(Player* p)
     g_pd3dDevice->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
     g_pd3dDevice->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
 
-    g_pd3dDevice->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 12, verts, CRAFT_VERT_STRIDE);
+    g_pd3dDevice->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 12, hv, sizeof(HV));
 
     g_pd3dDevice->SetRenderState(D3DRS_ZENABLE, TRUE);
-    g_pd3dDevice->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
-    g_pd3dDevice->SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
     g_pd3dDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW);
 }
 
@@ -708,7 +722,7 @@ static void Play_Update(float dt)
     if (s_player.ry < -PI * 0.499f) s_player.ry = -PI * 0.499f;
 
     /* Fly toggle */
-    if (pressed & CRAFT_BTN_FLY)
+    if ((pressed & CRAFT_BTN_FLY) && g_game_mode == MODE_CREATIVE)
     {
         s_player.flying = !s_player.flying; s_player.vy = 0.f;
     }
@@ -848,6 +862,9 @@ static void Play_Update(float dt)
 static void SaveCurrentGameState(void)
 {
     CCSaveState ss;
+    HANDLE hf;
+    DWORD  nw;
+    char   mb;
 
     ss.x = s_player.x;
     ss.y = s_player.y;
@@ -863,6 +880,32 @@ static void SaveCurrentGameState(void)
         db_save_state(s_player.x, s_player.y, s_player.z,
             s_player.rx, s_player.ry);
         db_commit();
+    }
+
+    /* Persist game mode separately -- one byte                           */
+    mb = (char)g_game_mode;
+    hf = CreateFileA("D:\\mode.dat", GENERIC_WRITE, 0, NULL,
+        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hf != INVALID_HANDLE_VALUE)
+    {
+        WriteFile(hf, &mb, 1, &nw, NULL);
+        CloseHandle(hf);
+    }
+}
+
+static void LoadGameMode(void)
+{
+    HANDLE hf;
+    DWORD  nr;
+    char   mb = MODE_CREATIVE;
+
+    hf = CreateFileA("D:\\mode.dat", GENERIC_READ, FILE_SHARE_READ,
+        NULL, OPEN_EXISTING, 0, NULL);
+    if (hf != INVALID_HANDLE_VALUE)
+    {
+        if (ReadFile(hf, &mb, 1, &nr, NULL) && nr == 1)
+            g_game_mode = (mb == MODE_SURVIVAL) ? MODE_SURVIVAL : MODE_CREATIVE;
+        CloseHandle(hf);
     }
 }
 
@@ -920,6 +963,10 @@ static void State_Enter(GameState eNew)
             Audio_MusicPlayTitle();
         /* Reload font -- loading screen Font_Free may have invalidated it */
         Menu_Init(g_pd3dDevice, Chunks_GetAtlas());
+        break;
+
+    case STATE_MODESELECT:
+        Menu_ModeSelectOpen();
         break;
 
     case STATE_SETTINGS:
@@ -1028,6 +1075,7 @@ static void Title_Draw(void)
 {
     Render_BeginFrame(0xFF000000);
     TitleTex_Draw();
+    Menu_VersionDraw();
     FadeDraw();
     Render_EndFrame();
 }
@@ -1039,23 +1087,13 @@ static void MainMenu_Update(WORD pressed)
     action = Menu_MainAction();
     if (action == MENU_ACTION_NEW_GAME)
     {
-        int ns = (int)GetTickCount();
-        s_world_seed = ns;
-        Chunks_ClearLoadedNoSave();
-        ChunkCache_DeleteAll();
-        ChunkCache_Init(ns);
-        db_close();
-        DeleteFileA(DB_PATH);
-        db_enable();
-        db_init((char*)DB_PATH);
-        s_loading_resume = 0;
-        s_loading_saved_label = 0;
-        StartFadeOut(STATE_LOADING);
+        StartFadeOut(STATE_MODESELECT);
     }
     else if (action == MENU_ACTION_RESUME)
     {
         s_loading_resume = 1;
         s_loading_saved_label = 1;
+        LoadGameMode();
         StartFadeOut(STATE_LOADING);
     }
     else if (action == MENU_ACTION_SETTINGS)
@@ -1079,6 +1117,45 @@ static void MainMenu_Draw(void)
         Menu_SettingsDraw();
     else
         Menu_MainDraw(0.8f);
+    FadeDraw();
+    Render_EndFrame();
+}
+
+/* =========================================================================
+   Mode Select  (New Game -> CREATIVE / SURVIVAL)
+   UI lives in menu.cpp -- this just wires the result to game state.
+========================================================================= */
+
+/* Wipe world + db and kick off generation for the chosen mode            */
+static void StartNewGame(int mode)
+{
+    int ns = (int)GetTickCount();
+    g_game_mode = mode;
+    s_world_seed = ns;
+    Chunks_ClearLoadedNoSave();
+    ChunkCache_DeleteAll();
+    ChunkCache_Init(ns);
+    db_close();
+    DeleteFileA(DB_PATH);
+    db_enable();
+    db_init((char*)DB_PATH);
+    s_loading_resume = 0;
+    s_loading_saved_label = 0;
+    StartFadeOut(STATE_LOADING);
+}
+
+static void ModeSelect_Update(WORD pressed)
+{
+    int r = Menu_ModeSelectUpdate(pressed);
+    if (r == MODESEL_CREATIVE)      StartNewGame(MODE_CREATIVE);
+    else if (r == MODESEL_SURVIVAL) StartNewGame(MODE_SURVIVAL);
+    else if (r == MODESEL_BACK)     StartFadeOut(STATE_MAIN_MENU);
+}
+
+static void ModeSelect_Draw(void)
+{
+    Render_BeginFrame(0xFF000000);
+    Menu_ModeSelectDraw();
     FadeDraw();
     Render_EndFrame();
 }
@@ -1192,6 +1269,8 @@ void __cdecl main(void)
                     Title_Update(pressed);
                 if (s_eState == STATE_MAIN_MENU)
                     MainMenu_Update(pressed);
+                if (s_eState == STATE_MODESELECT)
+                    ModeSelect_Update(pressed);
                 if (s_eState == STATE_SETTINGS)
                 {
                     int done = Menu_SettingsUpdate(pressed);
@@ -1215,20 +1294,20 @@ void __cdecl main(void)
                     int pa = Menu_PauseUpdate(pressed);
                     if (pa == MENU_ACTION_RESUME)    s_eState = STATE_PLAY;
                     if (pa == MENU_ACTION_SETTINGS)  StartFadeOut(STATE_SETTINGS);
-                    if (pa == MENU_ACTION_SAVE_QUIT)
+                    if (pa == MENU_ACTION_SAVE)
                     {
+                        /* Save and return to gameplay -- stay in world     */
+                        SaveCurrentGameState();
+                        s_eState = STATE_PLAY;
+                    }
+                    if (pa == MENU_ACTION_QUIT)
+                    {
+                        /* Save then quit to main menu                      */
                         SaveCurrentGameState();
                         StartFadeOut(STATE_MAIN_MENU);
                     }
                     if (pa == MENU_ACTION_NEW_GAME)
-                    {
-                        Chunks_ClearLoadedNoSave();
-                        ChunkCache_DeleteAll();
-                        ChunkCache_Init(WORLD_SEED);
-                        s_loading_resume = 0;
-                        s_loading_saved_label = 0;
-                        StartFadeOut(STATE_LOADING);
-                    }
+                        StartFadeOut(STATE_MODESELECT);
                 }
             }
 
@@ -1236,6 +1315,8 @@ void __cdecl main(void)
                 Title_Draw();
             else if (s_eState == STATE_MAIN_MENU)
                 MainMenu_Draw();
+            else if (s_eState == STATE_MODESELECT)
+                ModeSelect_Draw();
             else if (s_eState == STATE_SETTINGS)
             {
                 Render_BeginFrame(0xFF000000);

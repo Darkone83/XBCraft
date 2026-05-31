@@ -57,10 +57,11 @@ static Font* s_pFont = NULL;
 #define MAIN_ITEM_COUNT    5
 
 #define PAUSE_ITEM_RESUME    0
-#define PAUSE_ITEM_SAVE_QUIT 1
+#define PAUSE_ITEM_SAVE      1
 #define PAUSE_ITEM_SETTINGS  2
 #define PAUSE_ITEM_NEW_GAME  3
-#define PAUSE_ITEM_COUNT     4
+#define PAUSE_ITEM_QUIT      4
+#define PAUSE_ITEM_COUNT     5
 
 #define SET_PLANTS     0
 #define SET_TREES      1
@@ -79,7 +80,7 @@ static int s_set_sel = 0;
 static const char* s_main_labels[MAIN_ITEM_COUNT] =
 { "NEW GAME", "LOAD GAME", "SETTINGS", "HELP", "QUIT" };
 static const char* s_pause_labels[PAUSE_ITEM_COUNT] =
-{ "RESUME", "SAVE AND QUIT", "SETTINGS", "NEW GAME" };
+{ "RESUME", "SAVE", "SETTINGS", "NEW GAME", "QUIT" };
 static const char* s_base_labels[SET_COUNT_BASE] =
 { "PLANTS: ", "TREES:  ", "CLOUDS: ", "VIEW DIST: ", "< BACK" };
 
@@ -486,6 +487,94 @@ int Menu_HelpUpdate(WORD pressed)
     return 0;
 }
 
+/* =========================================================================
+   Mode Select  (New Game -> CREATIVE / SURVIVAL)
+========================================================================= */
+
+static int s_mode_sel = 0;   /* 0 = Creative, 1 = Survival */
+
+static const char* s_mode_labels[2] = { "CREATIVE", "SURVIVAL" };
+static const char* s_mode_descs[2] = {
+    "BUILD FREELY - NO LIMITS",
+    "SURVIVE THE NIGHT - PREVIEW"
+};
+
+void Menu_ModeSelectOpen(void)
+{
+    s_mode_sel = 0;
+}
+
+void Menu_ModeSelectDraw(void)
+{
+    float sw = (float)g_dwDisplayW;
+    float sh = (float)g_dwDisplayH;
+    float pw = sw * 0.42f;
+    float bh = 40.f;
+    float gap = 10.f;
+    float px = (sw - pw) * 0.5f;
+    float py = sh * 0.50f;
+    int   i;
+
+    SetMenuRS();
+    DrawBackground();
+
+    if (s_pFont)
+    {
+        float tw = Font_Width(s_pFont, "SELECT MODE");
+        s_pDev->SetTexture(0, NULL);
+        s_pDev->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+        s_pDev->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
+        s_pDev->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
+        s_pDev->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
+        Font_Draw(s_pFont, "SELECT MODE", (sw - tw) * 0.5f, sh * 0.40f, 0xFFFFFFFF);
+    }
+
+    for (i = 0; i < 2; i++)
+        DrawButton(px, py + (float)i * (bh + gap), pw, bh,
+            (i == s_mode_sel), s_mode_labels[i]);
+
+    if (s_pFont)
+    {
+        const char* d = s_mode_descs[s_mode_sel];
+        float tw = Font_Width(s_pFont, d);
+        Font_Draw(s_pFont, d, (sw - tw) * 0.5f,
+            py + 2.f * (bh + gap) + 12.f, 0xFF888888);
+    }
+
+    RestoreRS();
+}
+
+int Menu_ModeSelectUpdate(WORD pressed)
+{
+    if (pressed & (BTN_DPAD_UP | BTN_DPAD_DOWN))
+        s_mode_sel ^= 1;
+    if (pressed & BTN_B)
+        return MODESEL_BACK;
+    if (pressed & (BTN_A | BTN_START))
+        return (s_mode_sel == 0) ? MODESEL_CREATIVE : MODESEL_SURVIVAL;
+    return MODESEL_NONE;
+}
+
+/* =========================================================================
+   Version string -- lower-right corner of the title screen
+========================================================================= */
+
+void Menu_VersionDraw(void)
+{
+    float sw = (float)g_dwDisplayW;
+    float sh = (float)g_dwDisplayH;
+    float tw;
+
+    if (!s_pFont) return;
+
+    s_pDev->SetRenderState(D3DRS_ZENABLE, FALSE);
+    s_pDev->SetRenderState(D3DRS_FOGENABLE, FALSE);
+    s_pDev->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+
+    tw = Font_Width(s_pFont, XBCRAFT_VERSION);
+    Font_Draw(s_pFont, XBCRAFT_VERSION, sw - tw - 30.f, sh - 40.f, 0xFFFFFFFF);
+}
+
 int Menu_PauseUpdate(WORD pressed)
 {
     int action = MENU_ACTION_NONE;
@@ -497,9 +586,10 @@ int Menu_PauseUpdate(WORD pressed)
         switch (s_pause_sel)
         {
         case PAUSE_ITEM_RESUME:    action = MENU_ACTION_RESUME;    break;
-        case PAUSE_ITEM_SAVE_QUIT: action = MENU_ACTION_SAVE_QUIT; break;
+        case PAUSE_ITEM_SAVE:      action = MENU_ACTION_SAVE;      break;
         case PAUSE_ITEM_SETTINGS:  action = MENU_ACTION_SETTINGS;  break;
         case PAUSE_ITEM_NEW_GAME:  action = MENU_ACTION_NEW_GAME;  break;
+        case PAUSE_ITEM_QUIT:      action = MENU_ACTION_QUIT;      break;
         }
     }
     return action;
@@ -511,7 +601,7 @@ int Menu_SettingsUpdate(WORD pressed)
     int back = cnt - 1;
     if (pressed & BTN_DPAD_UP) { s_set_sel--; if (s_set_sel < 0) s_set_sel = cnt - 1; }
     if (pressed & BTN_DPAD_DOWN) { s_set_sel++; if (s_set_sel >= cnt) s_set_sel = 0; }
-    if (pressed & BTN_B) { Menu_SaveSettings(); return 1; }
+    if (pressed & (BTN_B | BTN_BACK)) { Menu_SaveSettings(); return 1; }
     if (pressed & (BTN_A | BTN_START))
     {
         if (s_set_sel == back) { Menu_SaveSettings(); return 1; }

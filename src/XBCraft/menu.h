@@ -4,6 +4,9 @@
 #include <xtl.h>
 #include "map.h"
 
+/* Build version -- shown on title screen */
+#define XBCRAFT_VERSION  "v1.1"
+
 /* Action codes returned by update functions */
 #define MENU_ACTION_NONE      0
 #define MENU_ACTION_RESUME    1
@@ -12,6 +15,13 @@
 #define MENU_ACTION_SETTINGS  4
 #define MENU_ACTION_QUIT      5
 #define MENU_ACTION_HELP      6
+#define MENU_ACTION_SAVE      7
+
+/* Mode select return codes */
+#define MODESEL_NONE      0
+#define MODESEL_CREATIVE  1
+#define MODESEL_SURVIVAL  2
+#define MODESEL_BACK      3
 
 /* Init -- call from SetState, OUTSIDE BeginScene. Loads font + textures. */
 void Menu_Init(IDirect3DDevice8* pDev, IDirect3DTexture8* pAtlas);
@@ -26,16 +36,20 @@ void Menu_MainDraw(float daylight);
 void Menu_SettingsDraw(void);
 void Menu_HelpDraw(void);
 void Menu_PauseDraw(void);
+void Menu_ModeSelectDraw(void);
+void Menu_VersionDraw(void);   /* version string, lower-right */
 
 /* Update -- call before BeginFrame */
 void Menu_MainUpdate(WORD pressed);
 int  Menu_PauseUpdate(WORD pressed);
 int  Menu_SettingsUpdate(WORD pressed);  /* returns 1 when done/back */
 int  Menu_HelpUpdate(WORD pressed);      /* returns 1 when done/back */
+int  Menu_ModeSelectUpdate(WORD pressed);/* returns MODESEL_* code   */
 int  Menu_MainAction(void);
 
 /* Pause open -- resets selection */
 void Menu_PauseOpen(void);
+void Menu_ModeSelectOpen(void);          /* resets highlight to Creative */
 int  Menu_SettingsActive(void);
 
 /* Extern toggles defined in main.cpp */
